@@ -94,6 +94,14 @@ export interface ModelMapping {
   displayName?: string
 }
 
+export interface PoolKey {
+  id: string
+  key: string
+  prefix: string
+  name: string
+  enabled: boolean
+}
+
 export interface ProxySettings {
   proxyURL: string
 }
@@ -198,6 +206,15 @@ export const api = {
 
   regeneratePoolKey: () =>
     request<PoolConfig>("/pool/regenerate-key", { method: "POST" }),
+
+  // Pool key management
+  getPoolKeys: () => request<Array<PoolKey>>("/pool/keys"),
+  addPoolKey: (data: { name: string; prefix: string }) =>
+    request<PoolKey>("/pool/keys", { method: "POST", body: JSON.stringify(data) }),
+  updatePoolKey: (id: string, data: { name: string; prefix: string; enabled: boolean }) =>
+    request<void>(`/pool/keys/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deletePoolKey: (id: string) =>
+    request<void>(`/pool/keys/${id}`, { method: "DELETE" }),
 
   // Model mapping API
   getModelMappings: () =>

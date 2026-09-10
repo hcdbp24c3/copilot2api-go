@@ -71,6 +71,12 @@ func ForwardCompletionsResponse(c *gin.Context, resp *http.Response) {
 // accepts in session.create take precedence over the REST /models list, which
 // contains entries that cannot actually be used through this proxy.
 func ModelsHandler(c *gin.Context, state *config.State) {
+	ModelsHandlerPool(c, state, "")
+}
+
+// ModelsHandlerPool returns models with an optional prefix prepended to IDs.
+// When prefix is non-empty, model IDs become "prefix/displayId".
+func ModelsHandlerPool(c *gin.Context, state *config.State, prefix string) {
 	state.RLock()
 	models := state.SDKModels
 	if models == nil {
@@ -91,8 +97,12 @@ func ModelsHandler(c *gin.Context, state *config.State) {
 		Data:   make([]config.ModelEntry, len(models.Data)),
 	}
 	for i, m := range models.Data {
+		displayID := store.ToDisplayID(m.ID)
+		if prefix != "" {
+			displayID = prefix + "/" + displayID
+		}
 		mapped.Data[i] = config.ModelEntry{
-			ID:           store.ToDisplayID(m.ID),
+			ID:           displayID,
 			Object:       m.Object,
 			Created:      m.Created,
 			OwnedBy:      m.OwnedBy,

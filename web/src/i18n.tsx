@@ -175,6 +175,22 @@ const en = {
   claudeCodePoolKey: "Pool Key",
   claudeCodeCustomModel: "Custom...",
   claudeCodeCustomModelPlaceholder: "Enter custom model name",
+
+  // Pool Keys
+  poolKeys: "Pool Keys",
+  poolKeysDesc: "Multiple API keys with custom model prefixes. Models appear as prefix/model",
+  addPoolKey: "Add Pool Key",
+  poolKeyName: "Name",
+  poolKeyPrefix: "Prefix",
+  poolKeyValue: "Key",
+  poolKeyEnabled: "Enabled",
+  deletePoolKey: "Delete",
+  noPoolKeys: "No pool keys configured. Add one with a name and prefix.",
+  enabled: "On",
+  disabled: "Off",
+
+  // Add All Models
+  addAllModels: "Add All",
 } as const
 
 export type TranslationKey = keyof typeof en
@@ -351,6 +367,22 @@ const zh: Translations = {
   claudeCodePoolKey: "池密钥",
   claudeCodeCustomModel: "自定义...",
   claudeCodeCustomModelPlaceholder: "输入自定义模型名称",
+
+  // Pool Keys
+  poolKeys: "池密钥管理",
+  poolKeysDesc: "多个 API 密钥，每个可自定义模型前缀。模型显示为 前缀/模型名",
+  addPoolKey: "添加池密钥",
+  poolKeyName: "名称",
+  poolKeyPrefix: "前缀",
+  poolKeyValue: "密钥",
+  poolKeyEnabled: "启用",
+  deletePoolKey: "删除",
+  noPoolKeys: "暂无池密钥，请添加一个名称和前缀",
+  enabled: "开启",
+  disabled: "关闭",
+
+  // Add All Models
+  addAllModels: "全部添加",
 } as const
 
 interface I18nContextValue {

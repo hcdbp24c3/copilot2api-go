@@ -114,6 +114,12 @@ func RegisterConsoleAPI(r *gin.Engine, proxyPort int) {
 	protected.PUT("/pool", handleUpdatePool)
 	protected.POST("/pool/regenerate-key", handleRegeneratePoolKey)
 
+	// Pool key management
+	protected.GET("/pool/keys", handleGetPoolKeys)
+	protected.POST("/pool/keys", handleAddPoolKey)
+	protected.PUT("/pool/keys/:id", handleUpdatePoolKey)
+	protected.DELETE("/pool/keys/:id", handleDeletePoolKey)
+
 	// Model mapping
 	protected.GET("/model-map", handleGetModelMap)
 	protected.PUT("/model-map", handleSetModelMap)
@@ -596,7 +602,7 @@ func handleUpdatePool(c *gin.Context) {
 	}
 
 	// Generate a key if pool is being enabled and has no key yet
-	if existing.Enabled && existing.ApiKey == "" {
+	if existing.Enabled && existing.ApiKey == "" && len(existing.PoolKeys) == 0 {
 		existing.ApiKey = "sk-pool-" + uuid.New().String()
 	}
 
@@ -628,6 +634,61 @@ func handleRegeneratePoolKey(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, cfg)
+}
+
+// --- Pool key handlers ---
+
+func handleGetPoolKeys(c *gin.Context) {
+	cfg, err := store.GetPoolConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, cfg.PoolKeys)
+}
+
+func handleAddPoolKey(c *gin.Context) {
+	var body struct {
+		Name   string `json:"name"`
+		Prefix string `json:"prefix"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.Name == "" || body.Prefix == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name and prefix are required"})
+		return
+	}
+	pk, err := store.AddPoolKey(body.Name, body.Prefix)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, pk)
+}
+
+func handleUpdatePoolKey(c *gin.Context) {
+	id := c.Param("id")
+	var body struct {
+		Name    string `json:"name"`
+		Prefix  string `json:"prefix"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	if err := store.UpdatePoolKey(id, body.Name, body.Prefix, body.Enabled); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleDeletePoolKey(c *gin.Context) {
+	id := c.Param("id")
+	if err := store.DeletePoolKey(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // --- Model map handlers ---

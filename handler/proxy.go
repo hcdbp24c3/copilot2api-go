@@ -63,13 +63,26 @@ func proxyAuth() gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Check pool API key first
+		// Check pool API keys (multi-key system)
 		poolCfg, _ := store.GetPoolConfig()
-		if poolCfg != nil && poolCfg.Enabled && poolCfg.ApiKey == token {
-			c.Set("isPool", true)
-			c.Set("poolStrategy", poolCfg.Strategy)
-			c.Next()
-			return
+		if poolCfg != nil && poolCfg.Enabled {
+			// Check legacy single key
+			if poolCfg.ApiKey == token {
+				c.Set("isPool", true)
+				c.Set("poolStrategy", poolCfg.Strategy)
+				c.Set("poolPrefix", "")
+				c.Next()
+				return
+			}
+			// Check multi-pool keys
+			if pk := store.GetPoolKeyByKey(token); pk != nil {
+				c.Set("isPool", true)
+				c.Set("poolStrategy", poolCfg.Strategy)
+				c.Set("poolPrefix", pk.Prefix)
+				c.Set("poolKeyName", pk.Name)
+				c.Next()
+				return
+			}
 		}
 
 		// Check individual account API key
@@ -219,7 +232,9 @@ func proxyModels(c *gin.Context) {
 	if resolved == nil {
 		return
 	}
-	instance.ModelsHandler(c, resolved.State)
+	prefix, _ := c.Get("poolPrefix")
+	prefixStr, _ := prefix.(string)
+	instance.ModelsHandlerPool(c, resolved.State, prefixStr)
 }
 
 func proxyEmbeddings(c *gin.Context) {

@@ -21,11 +21,20 @@ type Account struct {
 	Priority    int    `json:"priority"`
 }
 
+type PoolKey struct {
+	ID      string `json:"id"`
+	Key     string `json:"key"`
+	Prefix  string `json:"prefix"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
 type PoolConfig struct {
-	Enabled      bool   `json:"enabled"`
-	Strategy     string `json:"strategy"`
-	ApiKey       string `json:"apiKey"`
-	RateLimitRPM int    `json:"rateLimitRPM,omitempty"` // Per-account rate limit (requests per minute), 0 = no limit
+	Enabled      bool      `json:"enabled"`
+	Strategy     string    `json:"strategy"`
+	ApiKey       string    `json:"apiKey,omitempty"` // legacy single key
+	PoolKeys     []PoolKey `json:"poolKeys,omitempty"`
+	RateLimitRPM int       `json:"rateLimitRPM,omitempty"`
 }
 
 type accountStore struct {

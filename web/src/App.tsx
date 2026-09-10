@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 
-import { api, getSessionToken, setSessionToken, type Account, type BatchUsageItem, type CopilotModel, type ModelMapping, type PoolConfig, type ProxySettings, type ProxyUsageSnapshot } from "./api"
+import { api, getSessionToken, setSessionToken, type Account, type BatchUsageItem, type CopilotModel, type ModelMapping, type PoolConfig, type PoolKey, type ProxySettings, type ProxyUsageSnapshot } from "./api"
 import { AccountCard } from "./components/AccountCard"
 import { AddAccountForm } from "./components/AddAccountForm"
 import { useLocale, useT } from "./i18n"
@@ -260,6 +260,114 @@ function PoolSettings({ pool, onChange }: { pool: PoolConfig; onChange: (p: Pool
             {t("baseUrl")} {proxyBase} &nbsp;·&nbsp; Bearer {pool.apiKey?.slice(0, 8)}...
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+function PoolKeysPanel() {
+  const [keys, setKeys] = useState<Array<PoolKey>>([])
+  const [loading, setLoading] = useState(false)
+  const [fetched, setFetched] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newPrefix, setNewPrefix] = useState("")
+  const [adding, setAdding] = useState(false)
+  const t = useT()
+
+  const fetchKeys = async () => {
+    setLoading(true)
+    try {
+      const data = await api.getPoolKeys()
+      setKeys(data ?? [])
+      setFetched(true)
+      setOpen(true)
+    } catch (err) { console.error("Failed to fetch pool keys:", err) }
+    finally { setLoading(false) }
+  }
+
+  const addKey = async () => {
+    if (!newName || !newPrefix) return
+    setAdding(true)
+    try {
+      await api.addPoolKey({ name: newName, prefix: newPrefix })
+      setNewName("")
+      setNewPrefix("")
+      const data = await api.getPoolKeys()
+      setKeys(data ?? [])
+    } catch (err) { console.error("Add pool key failed:", err) }
+    finally { setAdding(false) }
+  }
+
+  const deleteKey = async (id: string) => {
+    try {
+      await api.deletePoolKey(id)
+      const data = await api.getPoolKeys()
+      setKeys(data ?? [])
+    } catch (err) { console.error("Delete pool key failed:", err) }
+  }
+
+  const toggleKey = async (pk: PoolKey) => {
+    try {
+      await api.updatePoolKey(pk.id, { name: pk.name, prefix: pk.prefix, enabled: !pk.enabled })
+      const data = await api.getPoolKeys()
+      setKeys(data ?? [])
+    } catch (err) { console.error("Toggle pool key failed:", err) }
+  }
+
+  const copyKey = (key: string) => {
+    void navigator.clipboard.writeText(key)
+  }
+
+  const maskedKey = (key: string) => key.length > 16 ? `${key.slice(0, 12)}${"•".repeat(20)}` : key
+
+  return (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 16, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{t("poolKeys")}</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("poolKeysDesc")}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!fetched && <button className="primary" onClick={() => void fetchKeys()} disabled={loading}>{loading ? t("loading") : t("show")}</button>}
+          {fetched && <button onClick={() => setOpen(!open)}>{open ? t("hide") : t("show")}</button>}
+        </div>
+      </div>
+      {open && fetched && (
+        <div style={{ marginTop: 12 }}>
+          {keys.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 16 }}>{t("noPoolKeys")}</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 1fr 80px 60px", gap: 8, fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
+                <span>{t("poolKeyName")}</span><span>{t("poolKeyPrefix")}</span><span>{t("poolKeyValue")}</span><span>{t("poolKeyEnabled")}</span><span />
+              </div>
+              {keys.map((pk) => (
+                <div key={pk.id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 1fr 80px 60px", gap: 8, alignItems: "center", fontSize: 12 }}>
+                  <span style={{ fontFamily: "monospace" }}>{pk.name}</span>
+                  <span style={{ fontFamily: "monospace", color: "var(--green)" }}>{pk.prefix}</span>
+                  <span
+                    onClick={() => copyKey(pk.key)}
+                    style={{ fontFamily: "monospace", cursor: "pointer", color: "var(--text-muted)" }}
+                    title="Click to copy"
+                  >{maskedKey(pk.key)}</span>
+                  <button
+                    onClick={() => void toggleKey(pk)}
+                    style={{ fontSize: 11, padding: "2px 8px", color: pk.enabled ? "var(--green)" : "var(--text-muted)" }}
+                  >{pk.enabled ? t("enabled") : t("disabled")}</button>
+                  <button className="danger" onClick={() => void deleteKey(pk.id)} style={{ padding: "2px 6px", fontSize: 11 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("poolKeyName")} style={{ fontSize: 12, padding: "4px 8px", width: 120 }} />
+            <input value={newPrefix} onChange={(e) => setNewPrefix(e.target.value)} placeholder={t("poolKeyPrefix")} style={{ fontSize: 12, padding: "4px 8px", width: 100 }} />
+            <button className="primary" onClick={() => void addKey()} disabled={adding || !newName || !newPrefix} style={{ fontSize: 12, padding: "4px 12px" }}>
+              {adding ? t("saving") : t("addPoolKey")}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -740,6 +848,18 @@ function ModelMappingPanel() {
     setMappings(updated)
   }
 
+  const unmappedCount = modelsFetched ? copilotModels.filter(m => !m.mapped && !mappings.some(mm => mm.copilotId === m.id)).length : 0
+
+  const addAllUnmapped = () => {
+    const newMappings = [...mappings]
+    for (const m of copilotModels) {
+      if (!m.mapped && !newMappings.some(mm => mm.copilotId === m.id)) {
+        newMappings.push({ copilotId: m.id, displayId: "", displayName: "" })
+      }
+    }
+    setMappings(newMappings)
+  }
+
   const thStyle: React.CSSProperties = { padding: "6px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }
 
   return (
@@ -760,9 +880,16 @@ function ModelMappingPanel() {
           <div style={{ marginBottom: 16, padding: 12, background: "var(--bg)", borderRadius: "var(--radius)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{t("copilotModels")}</span>
-              <button onClick={() => void fetchCopilotModels()} disabled={fetchingModels} style={{ fontSize: 12, padding: "4px 12px" }}>
-                {fetchingModels ? t("fetchingModels") : t("fetchModels")}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                {modelsFetched && unmappedCount > 0 && (
+                  <button onClick={addAllUnmapped} disabled={saving} style={{ fontSize: 12, padding: "4px 12px" }}>
+                    {t("addAllModels")} ({unmappedCount})
+                  </button>
+                )}
+                <button onClick={() => void fetchCopilotModels()} disabled={fetchingModels} style={{ fontSize: 12, padding: "4px 12px" }}>
+                  {fetchingModels ? t("fetchingModels") : t("fetchModels")}
+                </button>
+              </div>
             </div>
             {modelsFetched && (
               copilotModels.length === 0 ? (
@@ -872,6 +999,7 @@ function Dashboard() {
       </header>
       <ProxySettingsPanel settings={proxySettings} onChange={setProxySettings} />
       <PoolSettings pool={pool} onChange={setPool} />
+      <PoolKeysPanel />
       <BatchUsagePanel />
       <ProxyUsagePanel accounts={accounts} />
       <ModelMappingPanel />
