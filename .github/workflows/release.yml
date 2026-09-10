@@ -11,10 +11,29 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  binaries:
+  build-binaries:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            output: copilot-go-linux-amd64
+          - goos: linux
+            goarch: arm64
+            output: copilot-go-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            output: copilot-go-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            output: copilot-go-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            output: copilot-go-windows-amd64.exe
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,38 +48,62 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache Bun modules
+        uses: actions/cache@v4
+        with:
+          path: web/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - name: Build frontend
         working-directory: web
         run: |
           bun install --frozen-lockfile
           bun run build
 
-      - name: Build binaries (linux/amd64)
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-linux-amd64 .
+      - name: Build binary
+        run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.output }} .
 
-      - name: Build binaries (linux/arm64)
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o copilot-go-linux-arm64 .
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: ${{ matrix.output }}
+          retention-days: 1
 
-      - name: Build binaries (darwin/amd64)
-        run: CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-darwin-amd64 .
+  release:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
-      - name: Build binaries (darwin/arm64)
-        run: CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o copilot-go-darwin-arm64 .
-
-      - name: Build binaries (windows/amd64)
-        run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-windows-amd64.exe .
+      - name: Generate checksums
+        working-directory: artifacts
+        run: sha256sum * > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            copilot-go-linux-amd64
-            copilot-go-linux-arm64
-            copilot-go-darwin-amd64
-            copilot-go-darwin-arm64
-            copilot-go-windows-amd64.exe
+            artifacts/*
           body: |
+            ## Binaries
+
+            | Platform | File |
+            |----------|------|
+            | Linux x64 | `copilot-go-linux-amd64` |
+            | Linux ARM64 | `copilot-go-linux-arm64` |
+            | macOS x64 | `copilot-go-darwin-amd64` |
+            | macOS ARM64 | `copilot-go-darwin-arm64` |
+            | Windows x64 | `copilot-go-windows-amd64.exe` |
+
             ## 🐳 Docker
 
             ```bash
@@ -132,35 +175,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Upload Docker release body
-        uses: softprops/action-gh-release@v2
-        with:
-          body: |
-            ## 🐳 Docker
-
-            ```bash
-            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-            ```
-
-            **Docker Compose:**
-
-            ```yaml
-            services:
-              copilot-go:
-                image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-                container_name: copilot-go
-                restart: unless-stopped
-                ports:
-                  - "3000:3000"
-                  - "4141:4141"
-                volumes:
-                  - copilot-data:/root/.local/share/copilot-api
-                environment:
-                  - TZ=Asia/Shanghai
-
-            volumes:
-              copilot-data:
-            ```
-
-            ---

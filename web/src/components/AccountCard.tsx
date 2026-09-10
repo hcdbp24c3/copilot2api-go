@@ -88,6 +88,13 @@ function QuotaBar({
 function UsagePanel({ usage }: { usage: UsageData }) {
   const q = usage.quota_snapshots
   const t = useT()
+  const planColors: Record<string, string> = {
+    free: "var(--text-muted)",
+    pro: "var(--accent)",
+    business: "var(--green)",
+    enterprise: "var(--yellow)",
+  }
+  const planColor = planColors[usage.copilot_plan] ?? "var(--accent)"
   return (
     <div
       style={{
@@ -98,9 +105,29 @@ function UsagePanel({ usage }: { usage: UsageData }) {
       }}
     >
       <div
-        style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginBottom: 8,
+        }}
       >
-        {t("plan")} {usage.copilot_plan} · {t("resets")} {usage.quota_reset_date}
+        <span
+          style={{
+            padding: "2px 8px",
+            background: planColor,
+            color: "#fff",
+            borderRadius: 4,
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          {usage.copilot_plan}
+        </span>
+        <span>{t("resets")} {usage.quota_reset_date}</span>
       </div>
       <QuotaBar
         label={t("premium")}
@@ -429,7 +456,9 @@ export function AccountCard({ account, proxyPort, onRefresh }: Props) {
             <StatusBadge status={status} />
           </div>
           <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {account.user?.login ? `@${account.user.login} · ` : ""}
+            {account.user?.login ? `@${account.user.login}` : ""}
+            {account.user?.email ? ` · ${account.user.email}` : ""}
+            {account.user?.login || account.user?.email ? " · " : ""}
             {account.accountType}
           </div>
           {account.error && (

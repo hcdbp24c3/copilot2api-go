@@ -29,7 +29,7 @@ export interface Account {
   priority: number
   status?: "running" | "stopped" | "error"
   error?: string
-  user?: { login: string } | null
+  user?: { login: string; email?: string } | null
 }
 
 export interface UsageData {

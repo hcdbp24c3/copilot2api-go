@@ -32,6 +32,7 @@ type ProxyInstance struct {
 type CopilotUser struct {
 	Login     string `json:"login"`
 	AvatarURL string `json:"avatar_url"`
+	Email     string `json:"email"`
 }
 
 func StartInstance(account store.Account) error {
