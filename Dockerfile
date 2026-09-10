@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=backend /app/copilot-go .
 
-EXPOSE 3000 4141
+EXPOSE 4141
 VOLUME /root/.local/share/copilot-api
 
 ENTRYPOINT ["./copilot-go"]

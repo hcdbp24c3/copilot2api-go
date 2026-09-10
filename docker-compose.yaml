@@ -4,8 +4,7 @@ services:
     container_name: copilot-go
     restart: unless-stopped
     ports:
-      - "3000:3000"   # Web Console
-      - "4141:4141"   # Proxy
+      - "4141:4141"   # Dashboard + Proxy
     volumes:
       - copilot-data:/root/.local/share/copilot-api
     environment:
