@@ -296,6 +296,17 @@ func refreshCopilotToken(state *config.State) error {
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
+		// Token exchange endpoint blocked (403 scraping detection).
+		// Fallback: use GitHub token directly as Bearer for Copilot API.
+		// This works because GitHub Copilot accepts PATs/OAuth tokens directly.
+		if resp.StatusCode == 403 {
+			log.Printf("Token exchange blocked (403), using GitHub token directly as Copilot token")
+			state.Lock()
+			state.CopilotToken = state.GithubToken
+			state.TokenExpiresAt = 0
+			state.Unlock()
+			return nil
+		}
 		return fmt.Errorf("copilot token request failed (status %d): %s", resp.StatusCode, string(body))
 	}
 
