@@ -10,6 +10,87 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          pnpm install
+          pnpm build
+
+      - name: Build binaries (linux/amd64)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-linux-amd64 .
+
+      - name: Build binaries (linux/arm64)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o copilot-go-linux-arm64 .
+
+      - name: Build binaries (darwin/amd64)
+        run: CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-darwin-amd64 .
+
+      - name: Build binaries (darwin/arm64)
+        run: CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o copilot-go-darwin-arm64 .
+
+      - name: Build binaries (windows/amd64)
+        run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o copilot-go-windows-amd64.exe .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            copilot-go-linux-amd64
+            copilot-go-linux-arm64
+            copilot-go-darwin-amd64
+            copilot-go-darwin-arm64
+            copilot-go-windows-amd64.exe
+          body: |
+            ## 🐳 Docker
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+
+            **Docker Compose:**
+
+            ```yaml
+            services:
+              copilot-go:
+                image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+                container_name: copilot-go
+                restart: unless-stopped
+                ports:
+                  - "3000:3000"
+                  - "4141:4141"
+                volumes:
+                  - copilot-data:/root/.local/share/copilot-api
+                environment:
+                  - TZ=Asia/Shanghai
+
+            volumes:
+              copilot-data:
+            ```
+
+            ---
+
   docker:
     runs-on: ubuntu-latest
     permissions:
@@ -54,10 +135,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create GitHub Release
+      - name: Upload Docker release body
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
           body: |
             ## 🐳 Docker
 
