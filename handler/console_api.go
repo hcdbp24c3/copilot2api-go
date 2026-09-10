@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"copilot-go/auth"
 	"copilot-go/config"
@@ -92,6 +94,9 @@ func RegisterConsoleAPI(r *gin.Engine, proxyPort int) {
 	protected.POST("/auth/device-code", handleDeviceCode)
 	protected.GET("/auth/poll/:sessionId", handlePollSession)
 	protected.POST("/auth/complete", handleCompleteAuth)
+
+	// Manual token auth
+	protected.POST("/auth/add-token", handleAddToken)
 
 	// Pool config
 	protected.GET("/pool", handleGetPool)
@@ -432,6 +437,66 @@ func handleCompleteAuth(c *gin.Context) {
 	}
 
 	auth.CleanupSession(body.SessionID)
+	c.JSON(http.StatusCreated, account)
+}
+
+// handleAddToken validates a GitHub token and creates an account directly.
+// This allows users to add accounts by pasting a token (fine-grained PAT,
+// OAuth token, etc.) without going through the OAuth device flow.
+func handleAddToken(c *gin.Context) {
+	var body struct {
+		Name        string `json:"name"`
+		GithubToken string `json:"githubToken"`
+		AccountType string `json:"accountType"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.GithubToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name and githubToken are required"})
+		return
+	}
+
+	if body.AccountType == "" {
+		body.AccountType = "individual"
+	}
+	if body.Name == "" {
+		body.Name = "GitHub Account"
+	}
+
+	// Validate the token by calling GitHub user API
+	req, err := http.NewRequest("GET", config.GithubUserURL, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
+		return
+	}
+	req.Header.Set("Authorization", "token "+body.GithubToken)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-GitHub-API-Version", config.GithubAPIVersion)
+
+	client := config.NewHTTPClient(10 * time.Second)
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to verify token: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid token (GitHub returned %d): %s", resp.StatusCode, string(respBody))})
+		return
+	}
+
+	var user struct {
+		Login string `json:"login"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&user); err == nil && user.Login != "" {
+		body.Name = user.Login
+	}
+
+	account, err := store.AddAccount(body.Name, body.GithubToken, body.AccountType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, account)
 }
 

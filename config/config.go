@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -157,4 +158,21 @@ func GithubHeaders(state *State) http.Header {
 	h.Set("X-GitHub-API-Version", GithubAPIVersion)
 	h.Set("X-Vscode-User-Agent-Library-Version", "electron-fetch")
 	return h
+}
+
+// ResolveGitHubToken returns the first non-empty GitHub token found in
+// environment variables, following the same priority order as GitHub Copilot CLI:
+//
+//	1. COPILOT_GITHUB_TOKEN  (highest priority, Copilot-specific)
+//	2. GH_TOKEN              (GitHub CLI compatible)
+//	3. GITHUB_TOKEN          (general GitHub token)
+//
+// Returns ("", false) when no env token is set.
+func ResolveGitHubToken() (string, bool) {
+	for _, envVar := range []string{"COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"} {
+		if tok := os.Getenv(envVar); tok != "" {
+			return tok, true
+		}
+	}
+	return "", false
 }

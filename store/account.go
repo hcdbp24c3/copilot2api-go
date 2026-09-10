@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -268,4 +269,55 @@ func RegeneratePoolApiKey() (string, error) {
 		return "", err
 	}
 	return cfg.ApiKey, nil
+}
+
+// envAccountMarker is a sentinel name used to identify accounts created from
+// environment tokens. This allows the app to detect and update them when the
+// token changes without user intervention.
+const envAccountMarker = "[env]"
+
+// GetOrCreateEnvTokenAccount finds an existing env-token account or creates one.
+// If an env-token account already exists but with a different token, it is updated.
+// The account name is prefixed with "[env]" to distinguish it from manual accounts.
+func GetOrCreateEnvTokenAccount(token string) (*Account, error) {
+	accountMu.Lock()
+	defer accountMu.Unlock()
+
+	accounts, err := readAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	// Look for an existing env-token account
+	for i, a := range accounts {
+		if a.Name == envAccountMarker || strings.HasPrefix(a.Name, envAccountMarker+" ") {
+			// Found env account — update token if changed
+			if accounts[i].GithubToken != token {
+				accounts[i].GithubToken = token
+				accounts[i].Enabled = true
+				if err := writeAccounts(accounts); err != nil {
+					return nil, err
+				}
+			}
+			return &accounts[i], nil
+		}
+	}
+
+	// No env account found — create one
+	account := Account{
+		ID:          uuid.New().String(),
+		Name:        envAccountMarker,
+		GithubToken: token,
+		AccountType: "individual",
+		ApiKey:      "sk-" + uuid.New().String(),
+		Enabled:     true,
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+		Priority:    0,
+	}
+
+	accounts = append(accounts, account)
+	if err := writeAccounts(accounts); err != nil {
+		return nil, err
+	}
+	return &account, nil
 }

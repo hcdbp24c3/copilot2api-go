@@ -1,4 +1,9 @@
 /web/dist/
+/web/node_modules/
+/web/pnpm-lock.yaml
+/web/pnpm-workspace.yaml
 zcopilot_*
 .gocache/
 .DS_Store
+.hive/
+.hive2/

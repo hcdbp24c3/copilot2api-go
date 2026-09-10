@@ -9,6 +9,7 @@ interface Props {
 }
 
 type Step = "config" | "authorize" | "done"
+type AuthMode = "oauth" | "token"
 
 function DeviceCodeDisplay({
   userCode,
@@ -139,78 +140,19 @@ function AuthorizeStep({
   )
 }
 
-function ConfigForm({
-  onSubmit,
-  onCancel,
-  loading,
-  error,
-  name,
-  setName,
-  accountType,
-  setAccountType,
-}: {
-  onSubmit: (e: React.SyntheticEvent) => void
-  onCancel: () => void
-  loading: boolean
-  error: string
-  name: string
-  setName: (v: string) => void
-  accountType: string
-  setAccountType: (v: string) => void
-}) {
-  const t = useT()
-  return (
-    <form onSubmit={onSubmit}>
-      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
-        {t("addAccountTitle")}
-      </h3>
-      <div style={{ display: "grid", gap: 12, marginBottom: 12 }}>
-        <div>
-          <label htmlFor="acc-name">{t("accountName")}</label>
-          <input
-            id="acc-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("accountNamePlaceholder")}
-          />
-        </div>
-        <div>
-          <label htmlFor="acc-type">{t("accountType")}</label>
-          <select
-            id="acc-type"
-            value={accountType}
-            onChange={(e) => setAccountType(e.target.value)}
-          >
-            <option value="individual">{t("individual")}</option>
-            <option value="business">{t("business")}</option>
-            <option value="enterprise">{t("enterprise")}</option>
-          </select>
-        </div>
-      </div>
-      {error && (
-        <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button type="button" onClick={onCancel}>
-          {t("cancel")}
-        </button>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? t("starting") : t("loginWithGithub")}
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function useAuthFlow(onComplete: () => Promise<void>) {
+export function AddAccountForm({ onComplete, onCancel }: Props) {
   const [step, setStep] = useState<Step>("config")
+  const [authMode, setAuthMode] = useState<AuthMode>("oauth")
+  const [name, setName] = useState("")
+  const [accountType, setAccountType] = useState("individual")
+  const [token, setToken] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  // OAuth device flow state
   const [userCode, setUserCode] = useState("")
   const [verificationUri, setVerificationUri] = useState("")
   const [authStatus, setAuthStatus] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const t = useT()
 
@@ -223,7 +165,8 @@ function useAuthFlow(onComplete: () => Promise<void>) {
 
   useEffect(() => cleanup, [cleanup])
 
-  const startAuth = async (name: string, accountType: string) => {
+  // OAuth device flow
+  const startOAuth = async () => {
     setError("")
     setLoading(true)
     try {
@@ -242,7 +185,7 @@ function useAuthFlow(onComplete: () => Promise<void>) {
               setAuthStatus(t("authorized"))
               await api.completeAuth({
                 sessionId: result.sessionId,
-                name,
+                name: name.trim() || "GitHub Account",
                 accountType,
               })
               setStep("done")
@@ -264,35 +207,43 @@ function useAuthFlow(onComplete: () => Promise<void>) {
     }
   }
 
-  return {
-    step,
-    userCode,
-    verificationUri,
-    authStatus,
-    loading,
-    error,
-    setError,
-    cleanup,
-    startAuth,
-  }
-}
-
-export function AddAccountForm({ onComplete, onCancel }: Props) {
-  const [name, setName] = useState("")
-  const [accountType, setAccountType] = useState("individual")
-  const auth = useAuthFlow(onComplete)
-  const t = useT()
-
-  const handleSubmit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    if (!name.trim()) {
-      auth.setError(t("accountNameRequired"))
+  // Token auth
+  const submitToken = async () => {
+    if (!token.trim()) {
+      setError(t("tokenRequired"))
       return
     }
-    void auth.startAuth(name.trim(), accountType)
+    setError("")
+    setLoading(true)
+    try {
+      await api.addToken({
+        name: name.trim() || "GitHub Account",
+        githubToken: token.trim(),
+        accountType,
+      })
+      setStep("done")
+      await onComplete()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (auth.step === "done") return null
+  const handleConfigSubmit = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    if (authMode === "token") {
+      void submitToken()
+    } else {
+      if (!name.trim()) {
+        setError(t("accountNameRequired"))
+        return
+      }
+      void startOAuth()
+    }
+  }
+
+  if (step === "done") return null
 
   return (
     <div
@@ -304,26 +255,136 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
         marginBottom: 16,
       }}
     >
-      {auth.step === "config" && (
-        <ConfigForm
-          onSubmit={handleSubmit}
-          onCancel={onCancel}
-          loading={auth.loading}
-          error={auth.error}
-          name={name}
-          setName={setName}
-          accountType={accountType}
-          setAccountType={setAccountType}
-        />
+      {step === "config" && (
+        <form onSubmit={handleConfigSubmit}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
+            {t("addAccountTitle")}
+          </h3>
+          <div style={{ display: "grid", gap: 12, marginBottom: 12 }}>
+            {authMode === "oauth" && (
+              <div>
+                <label htmlFor="acc-name">{t("accountName")}</label>
+                <input
+                  id="acc-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t("accountNamePlaceholder")}
+                />
+              </div>
+            )}
+            <div>
+              <label htmlFor="acc-type">{t("accountType")}</label>
+              <select
+                id="acc-type"
+                value={accountType}
+                onChange={(e) => setAccountType(e.target.value)}
+              >
+                <option value="individual">{t("individual")}</option>
+                <option value="business">{t("business")}</option>
+                <option value="enterprise">{t("enterprise")}</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Auth mode tabs */}
+          <div
+            style={{
+              display: "flex",
+              gap: 0,
+              marginBottom: 16,
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--border)",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("oauth")
+                setError("")
+              }}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 500,
+                background: authMode === "oauth" ? "var(--accent)" : "var(--bg)",
+                color: authMode === "oauth" ? "#fff" : "var(--text)",
+                transition: "all 0.15s",
+              }}
+            >
+              {t("loginWithGithub")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("token")
+                setError("")
+              }}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 500,
+                background: authMode === "token" ? "var(--accent)" : "var(--bg)",
+                color: authMode === "token" ? "#fff" : "var(--text)",
+                transition: "all 0.15s",
+              }}
+            >
+              {t("addWithToken")}
+            </button>
+          </div>
+
+          {/* Token input (only in token mode) */}
+          {authMode === "token" && (
+            <div style={{ display: "grid", gap: 12, marginBottom: 12 }}>
+              <div>
+                <label htmlFor="token">{t("tokenLabel")}</label>
+                <input
+                  id="token"
+                  type="password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder={t("tokenPlaceholder")}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onCancel}>
+              {t("cancel")}
+            </button>
+            <button type="submit" className="primary" disabled={loading}>
+              {loading
+                ? authMode === "token"
+                  ? t("tokenValidating")
+                  : t("starting")
+                : authMode === "token"
+                  ? t("addWithToken")
+                  : t("loginWithGithub")}
+            </button>
+          </div>
+        </form>
       )}
-      {auth.step === "authorize" && (
+      {step === "authorize" && (
         <AuthorizeStep
-          userCode={auth.userCode}
-          verificationUri={auth.verificationUri}
-          authStatus={auth.authStatus}
-          error={auth.error}
+          userCode={userCode}
+          verificationUri={verificationUri}
+          authStatus={authStatus}
+          error={error}
           onCancel={() => {
-            auth.cleanup()
+            cleanup()
             onCancel()
           }}
         />

@@ -177,6 +177,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  addToken: (data: { name: string; githubToken: string; accountType: string }) =>
+    request<Account>("/auth/add-token", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   updateAccount: (id: string, data: Record<string, unknown>) =>
     request<Account>(`/accounts/${id}`, {
       method: "PUT",

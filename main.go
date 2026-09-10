@@ -42,14 +42,36 @@ func main() {
 		accounts, err := store.GetEnabledAccounts()
 		if err != nil {
 			log.Printf("Warning: failed to load accounts: %v", err)
-		} else {
-			for _, account := range accounts {
-				go func(a store.Account) {
-					if err := instance.StartInstance(a); err != nil {
-						log.Printf("Failed to auto-start account %s: %v", a.Name, err)
+		}
+
+		// Handle environment token: create or update account from env var.
+		// Supports COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN (priority order).
+		if envToken, ok := config.ResolveGitHubToken(); ok {
+			envAccount, err := store.GetOrCreateEnvTokenAccount(envToken)
+			if err != nil {
+				log.Printf("Failed to sync env token account: %v", err)
+			} else {
+				// Ensure the env account is in the list and not duplicated
+				found := false
+				for i, a := range accounts {
+					if a.ID == envAccount.ID {
+						accounts[i] = *envAccount
+						found = true
+						break
 					}
-				}(account)
+				}
+				if !found {
+					accounts = append(accounts, *envAccount)
+				}
 			}
+		}
+
+		for _, account := range accounts {
+			go func(a store.Account) {
+				if err := instance.StartInstance(a); err != nil {
+					log.Printf("Failed to auto-start account %s: %v", a.Name, err)
+				}
+			}(account)
 		}
 	}
 

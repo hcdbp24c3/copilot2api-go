@@ -85,6 +85,12 @@ const en = {
   enterprise: "Enterprise",
   loginWithGithub: "Login with GitHub",
   accountNameRequired: "Account name is required",
+  addWithToken: "Add with Token",
+  tokenLabel: "GitHub Token",
+  tokenPlaceholder: "ghp_xxxx, gho_xxxx, or github_pat_xxxx",
+  tokenRequired: "Token is required",
+  tokenValidating: "Validating token...",
+  tokenAdded: "Account added successfully!",
 
   // GitHub Auth
   githubAuth: "GitHub Authorization",
@@ -255,6 +261,12 @@ const zh: Translations = {
   enterprise: "企业",
   loginWithGithub: "使用 GitHub 登录",
   accountNameRequired: "请输入账户名称",
+  addWithToken: "使用 Token 添加",
+  tokenLabel: "GitHub Token",
+  tokenPlaceholder: "ghp_xxxx, gho_xxxx 或 github_pat_xxxx",
+  tokenRequired: "请输入 Token",
+  tokenValidating: "验证 Token 中...",
+  tokenAdded: "账户添加成功！",
 
   // GitHub Auth
   githubAuth: "GitHub 授权",
