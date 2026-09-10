@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"sync"
+	"net/http"
 
 	"copilot-go/config"
 	"copilot-go/handler"
@@ -15,8 +15,8 @@ import (
 )
 
 func main() {
-	webPort := flag.Int("web-port", 3000, "Web console port")
-	proxyPort := flag.Int("proxy-port", 4141, "Proxy server port")
+	port := flag.Int("port", 4141, "Server port (dashboard + proxy)")
+	proxyPort := flag.Int("proxy-port", 4141, "Proxy port for endpoint display (same as --port)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	autoStart := flag.Bool("auto-start", true, "Auto-start enabled accounts")
 	flag.Parse()
@@ -75,49 +75,30 @@ func main() {
 		}
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	// Single engine: dashboard + proxy on one port
+	engine := gin.New()
+	engine.RedirectTrailingSlash = false
+	engine.RedirectFixedPath = false
+	engine.RemoveExtraSlash = false
 
-	// Start Web Console
-	go func() {
-		defer wg.Done()
-		webEngine := gin.New()
+	if *verbose {
+		engine.Use(gin.Logger())
+	}
+	engine.Use(gin.Recovery())
 
-		// Prevent Gin's automatic path normalization redirects from causing redirect loops
-		// for the SPA web console (e.g. clients receiving `Location: ./` on `/`).
-		webEngine.RedirectTrailingSlash = false
-		webEngine.RedirectFixedPath = false
-		webEngine.RemoveExtraSlash = false
+	// Health check
+	engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
-		if *verbose {
-			webEngine.Use(gin.Logger())
-		}
-		webEngine.Use(gin.Recovery())
+	// Register dashboard API + frontend
+	handler.RegisterConsoleAPI(engine, *proxyPort)
 
-		handler.RegisterConsoleAPI(webEngine, *proxyPort)
+	// Register proxy routes (with proxyAuth middleware)
+	handler.RegisterProxy(engine)
 
-		log.Printf("Web Console listening on :%d", *webPort)
-		if err := webEngine.Run(fmt.Sprintf(":%d", *webPort)); err != nil {
-			log.Fatalf("Web Console failed: %v", err)
-		}
-	}()
-
-	// Start Proxy
-	go func() {
-		defer wg.Done()
-		proxyEngine := gin.New()
-		if *verbose {
-			proxyEngine.Use(gin.Logger())
-		}
-		proxyEngine.Use(gin.Recovery())
-
-		handler.RegisterProxy(proxyEngine)
-
-		log.Printf("Proxy listening on :%d", *proxyPort)
-		if err := proxyEngine.Run(fmt.Sprintf(":%d", *proxyPort)); err != nil {
-			log.Fatalf("Proxy failed: %v", err)
-		}
-	}()
-
-	wg.Wait()
+	log.Printf("Server listening on :%d (dashboard + proxy)", *port)
+	if err := engine.Run(fmt.Sprintf(":%d", *port)); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
 }

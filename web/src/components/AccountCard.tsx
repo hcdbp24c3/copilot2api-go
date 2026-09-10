@@ -222,7 +222,6 @@ function ApiKeyPanel({
 
 interface Props {
   account: Account
-  proxyPort: number
   onRefresh: () => Promise<void>
 }
 
@@ -300,8 +299,8 @@ function AccountActions({
   )
 }
 
-function EndpointsPanel({ apiKey, proxyPort }: { apiKey: string; proxyPort: number }) {
-  const proxyBase = `${window.location.protocol}//${window.location.hostname}:${proxyPort}`
+function EndpointsPanel({ apiKey }: { apiKey: string }) {
+  const proxyBase = `${window.location.protocol}//${window.location.host}`
   const safeKey = apiKey ?? "YOUR_API_KEY"
   const [copied, copy] = useCopyFeedback()
   const t = useT()
@@ -534,7 +533,7 @@ export function AccountCard({ account, proxyPort, onRefresh }: Props) {
 
       <ApiKeyPanel apiKey={account.apiKey} onRegenerate={handleRegenerate} />
       {status === "running" && (
-        <EndpointsPanel apiKey={account.apiKey} proxyPort={proxyPort} />
+        <EndpointsPanel apiKey={account.apiKey} />
       )}
       {showUsage
         && (usage ?

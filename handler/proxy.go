@@ -14,7 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterProxy sets up the proxy server routes.
+// RegisterProxy sets up the proxy server routes on the given engine.
+// Proxy routes are grouped under /v1/ and / with proxyAuth middleware.
 func RegisterProxy(r *gin.Engine) {
 	// Initialize rate limiter from environment.
 	instance.InitRateLimiter()
@@ -24,22 +25,24 @@ func RegisterProxy(r *gin.Engine) {
 		instance.SetPerAccountRPM(poolCfg.RateLimitRPM)
 	}
 
-	r.Use(proxyAuth())
+	// Group proxy routes with proxy auth middleware
+	proxy := r.Group("")
+	proxy.Use(proxyAuth())
 
 	// OpenAI compatible endpoints
-	r.POST("/chat/completions", proxyCompletions)
-	r.POST("/v1/chat/completions", proxyCompletions)
-	r.GET("/models", proxyModels)
-	r.GET("/v1/models", proxyModels)
-	r.POST("/embeddings", proxyEmbeddings)
-	r.POST("/v1/embeddings", proxyEmbeddings)
+	proxy.POST("/chat/completions", proxyCompletions)
+	proxy.POST("/v1/chat/completions", proxyCompletions)
+	proxy.GET("/models", proxyModels)
+	proxy.GET("/v1/models", proxyModels)
+	proxy.POST("/embeddings", proxyEmbeddings)
+	proxy.POST("/v1/embeddings", proxyEmbeddings)
 
 	// Anthropic compatible endpoints
-	r.POST("/v1/messages", proxyMessages)
-	r.POST("/v1/messages/count_tokens", proxyCountTokens)
+	proxy.POST("/v1/messages", proxyMessages)
+	proxy.POST("/v1/messages/count_tokens", proxyCountTokens)
 
 	// OpenAI Responses API endpoint
-	r.POST("/v1/responses", proxyResponses)
+	proxy.POST("/v1/responses", proxyResponses)
 }
 
 func proxyAuth() gin.HandlerFunc {

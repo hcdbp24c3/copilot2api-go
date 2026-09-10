@@ -7,3 +7,4 @@ zcopilot_*
 .DS_Store
 .hive/
 .hive2/
+copilot-go-test

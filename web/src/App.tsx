@@ -95,7 +95,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   )
 }
 
-function AccountList({ accounts, proxyPort, onRefresh }: { accounts: Array<Account>; proxyPort: number; onRefresh: () => Promise<void> }) {
+function AccountList({ accounts, onRefresh }: { accounts: Array<Account>; onRefresh: () => Promise<void> }) {
   const t = useT()
   if (accounts.length === 0) {
     return (
@@ -108,7 +108,7 @@ function AccountList({ accounts, proxyPort, onRefresh }: { accounts: Array<Accou
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {accounts.map((account) => (
-        <AccountCard key={account.id} account={account} proxyPort={proxyPort} onRefresh={onRefresh} />
+        <AccountCard key={account.id} account={account} onRefresh={onRefresh} />
       ))}
     </div>
   )
@@ -191,7 +191,7 @@ function ProxySettingsPanel({ settings, onChange }: { settings: ProxySettings; o
   )
 }
 
-function PoolSettings({ pool, proxyPort, onChange }: { pool: PoolConfig; proxyPort: number; onChange: (p: PoolConfig) => void }) {
+function PoolSettings({ pool, onChange }: { pool: PoolConfig; onChange: (p: PoolConfig) => void }) {
   const [saving, setSaving] = useState(false)
   const [keyVisible, setKeyVisible] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -203,7 +203,7 @@ function PoolSettings({ pool, proxyPort, onChange }: { pool: PoolConfig; proxyPo
   const regenKey = async () => { setSaving(true); try { const updated = await api.regeneratePoolKey(); onChange(updated) } finally { setSaving(false) } }
   const copyKey = () => { void navigator.clipboard.writeText(pool.apiKey); setCopied(true); setTimeout(() => setCopied(false), 1500) }
   const maskedKey = pool.apiKey?.length > 8 ? `${pool.apiKey.slice(0, 8)}${"•".repeat(24)}` : pool.apiKey ?? ""
-  const proxyBase = `${window.location.protocol}//${window.location.hostname}:${proxyPort}`
+  const proxyBase = `${window.location.protocol}//${window.location.host}`
 
   const saveRPM = async () => {
     const num = parseInt(rpmInput, 10)
@@ -454,7 +454,7 @@ function ProxyUsagePanel({ accounts }: { accounts: Array<Account> }) {
   )
 }
 
-function ClaudeCodePanel({ accounts, proxyPort, pool }: { accounts: Array<Account>; proxyPort: number; pool: PoolConfig }) {
+function ClaudeCodePanel({ accounts, pool }: { accounts: Array<Account>; pool: PoolConfig }) {
   const [open, setOpen] = useState(false)
   const [model, setModel] = useState("claude-sonnet-4")
   const [smallModel, setSmallModel] = useState("claude-sonnet-4")
@@ -836,7 +836,6 @@ function Dashboard() {
   const [accounts, setAccounts] = useState<Array<Account>>([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [proxyPort, setProxyPort] = useState(4141)
   const [pool, setPool] = useState<PoolConfig>({ enabled: false, strategy: "round-robin" } as PoolConfig)
   const [proxySettings, setProxySettings] = useState<ProxySettings>({ proxyURL: "" })
   const t = useT()
@@ -848,7 +847,6 @@ function Dashboard() {
   }, [])
 
   useEffect(() => {
-    void api.getConfig().then((cfg) => setProxyPort(cfg.proxyPort))
     void api.getPool().then(setPool).catch(() => {})
     void api.getProxySettings().then(setProxySettings).catch(() => {})
     void refresh()
@@ -873,11 +871,11 @@ function Dashboard() {
         </div>
       </header>
       <ProxySettingsPanel settings={proxySettings} onChange={setProxySettings} />
-      <PoolSettings pool={pool} proxyPort={proxyPort} onChange={setPool} />
+      <PoolSettings pool={pool} onChange={setPool} />
       <BatchUsagePanel />
       <ProxyUsagePanel accounts={accounts} />
       <ModelMappingPanel />
-      <ClaudeCodePanel accounts={accounts} proxyPort={proxyPort} pool={pool} />
+      <ClaudeCodePanel accounts={accounts} pool={pool} />
       {showForm && (
         <div
           onClick={() => setShowForm(false)}
@@ -899,7 +897,7 @@ function Dashboard() {
       )}
       {loading
         ? <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 40 }}>{t("loading")}</p>
-        : <AccountList accounts={accounts} proxyPort={proxyPort} onRefresh={refresh} />}
+        : <AccountList accounts={accounts} onRefresh={refresh} />}
     </div>
   )
 }

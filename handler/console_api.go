@@ -31,7 +31,13 @@ func RegisterConsoleAPI(r *gin.Engine, proxyPort int) {
 		// Development: serve from filesystem
 		r.Static("/assets", filepath.Join(webDist, "assets"))
 		r.NoRoute(func(c *gin.Context) {
-			if !strings.HasPrefix(c.Request.URL.Path, "/api") && !strings.HasPrefix(c.Request.URL.Path, "/assets") {
+			if !strings.HasPrefix(c.Request.URL.Path, "/api") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/v1") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/health") &&
+				c.Request.URL.Path != "/models" &&
+				c.Request.URL.Path != "/chat/completions" &&
+				c.Request.URL.Path != "/embeddings" {
 				c.File(filepath.Join(webDist, "index.html"))
 			}
 		})
@@ -44,7 +50,13 @@ func RegisterConsoleAPI(r *gin.Engine, proxyPort int) {
 			assetsFS, _ := fs.Sub(distFS, "assets")
 			r.StaticFS("/assets", http.FS(assetsFS))
 			r.NoRoute(func(c *gin.Context) {
-				if !strings.HasPrefix(c.Request.URL.Path, "/api") && !strings.HasPrefix(c.Request.URL.Path, "/assets") {
+				if !strings.HasPrefix(c.Request.URL.Path, "/api") &&
+					!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
+					!strings.HasPrefix(c.Request.URL.Path, "/v1") &&
+					!strings.HasPrefix(c.Request.URL.Path, "/health") &&
+					c.Request.URL.Path != "/models" &&
+					c.Request.URL.Path != "/chat/completions" &&
+					c.Request.URL.Path != "/embeddings" {
 					data, err := fs.ReadFile(distFS, "index.html")
 					if err != nil {
 						c.String(http.StatusInternalServerError, "failed to load index.html")
@@ -62,7 +74,6 @@ func RegisterConsoleAPI(r *gin.Engine, proxyPort int) {
 	api.GET("/config", func(c *gin.Context) {
 		needsSetup, _ := store.IsSetupRequired()
 		c.JSON(http.StatusOK, gin.H{
-			"proxyPort":  proxyPort,
 			"needsSetup": needsSetup,
 		})
 	})
@@ -364,12 +375,13 @@ func handleStopAccount(c *gin.Context) {
 
 func handleGetAccountUsage(c *gin.Context) {
 	id := c.Param("id")
-	user, err := instance.GetUser(id)
+	// Use copilot_internal/user to get quota/usage data (not github.com/user which only has profile).
+	usage, err := fetchCopilotUsage(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, usage)
 }
 
 // --- Device flow handlers ---
