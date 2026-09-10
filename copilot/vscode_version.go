@@ -9,7 +9,7 @@ import (
 
 const (
 	aurURL            = "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=visual-studio-code-bin"
-	fallbackVSCodeVer = "1.104.3"
+	fallbackVSCodeVer = "1.105.1"
 )
 
 func GetVSCodeVersion() string {

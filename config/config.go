@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	CopilotVersion   = "0.26.7"
+	CopilotVersion   = "0.32.4"
 	GithubClientID   = "Iv1.b507a08c87ecfe98"
 	GithubAPIVersion = "2022-11-28"
 
@@ -157,6 +157,19 @@ func GithubHeaders(state *State) http.Header {
 	h.Set("User-Agent", fmt.Sprintf("GitHubCopilotChat/%s", CopilotVersion))
 	h.Set("X-GitHub-API-Version", GithubAPIVersion)
 	h.Set("X-Vscode-User-Agent-Library-Version", "electron-fetch")
+	return h
+}
+
+// TokenExchangeHeaders returns minimal headers for the Copilot token exchange endpoint.
+// Only sends what real VS Code sends — avoids detection by GitHub's anti-scraping.
+func TokenExchangeHeaders(state *State) http.Header {
+	state.RLock()
+	defer state.RUnlock()
+
+	h := make(http.Header)
+	h.Set("Authorization", "token "+state.GithubToken)
+	h.Set("Editor-Version", "vscode/"+state.VSCodeVersion)
+	h.Set("Editor-Plugin-Version", "copilot-chat/"+CopilotVersion)
 	return h
 }
 

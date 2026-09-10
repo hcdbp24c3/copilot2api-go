@@ -878,7 +878,25 @@ function Dashboard() {
       <ProxyUsagePanel accounts={accounts} />
       <ModelMappingPanel />
       <ClaudeCodePanel accounts={accounts} proxyPort={proxyPort} pool={pool} />
-      {showForm && <AddAccountForm onComplete={handleAdd} onCancel={() => setShowForm(false)} />}
+      {showForm && (
+        <div
+          onClick={() => setShowForm(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <AddAccountForm onComplete={handleAdd} onCancel={() => setShowForm(false)} />
+          </div>
+        </div>
+      )}
       {loading
         ? <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 40 }}>{t("loading")}</p>
         : <AccountList accounts={accounts} proxyPort={proxyPort} onRefresh={refresh} />}

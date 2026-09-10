@@ -284,7 +284,7 @@ func refreshCopilotToken(state *config.State) error {
 	if err != nil {
 		return err
 	}
-	for k, v := range config.GithubHeaders(state) {
+	for k, v := range config.TokenExchangeHeaders(state) {
 		req.Header[k] = v
 	}
 
