@@ -170,14 +170,13 @@ export const api = {
   completeAuth: (data: {
     sessionId: string
     name: string
-    accountType: string
   }) =>
     request<Account>("/auth/complete", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  addToken: (data: { name: string; githubToken: string; accountType: string }) =>
+  addToken: (data: { githubToken: string }) =>
     request<Account>("/auth/add-token", {
       method: "POST",
       body: JSON.stringify(data),

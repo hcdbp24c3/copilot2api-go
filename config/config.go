@@ -14,7 +14,7 @@ import (
 const (
 	CopilotVersion   = "0.26.7"
 	GithubClientID   = "Iv1.b507a08c87ecfe98"
-	GithubAPIVersion = "2025-04-01"
+	GithubAPIVersion = "2022-11-28"
 
 	CopilotIndividualChatURL = "https://api.githubcopilot.com"
 

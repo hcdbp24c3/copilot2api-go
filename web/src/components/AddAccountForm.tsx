@@ -144,7 +144,6 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
   const [step, setStep] = useState<Step>("config")
   const [authMode, setAuthMode] = useState<AuthMode>("oauth")
   const [name, setName] = useState("")
-  const [accountType, setAccountType] = useState("individual")
   const [token, setToken] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -186,7 +185,6 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
               await api.completeAuth({
                 sessionId: result.sessionId,
                 name: name.trim() || "GitHub Account",
-                accountType,
               })
               setStep("done")
               await onComplete()
@@ -217,9 +215,7 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
     setLoading(true)
     try {
       await api.addToken({
-        name: name.trim() || "GitHub Account",
         githubToken: token.trim(),
-        accountType,
       })
       setStep("done")
       await onComplete()
@@ -260,31 +256,6 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
             {t("addAccountTitle")}
           </h3>
-          <div style={{ display: "grid", gap: 12, marginBottom: 12 }}>
-            {authMode === "oauth" && (
-              <div>
-                <label htmlFor="acc-name">{t("accountName")}</label>
-                <input
-                  id="acc-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t("accountNamePlaceholder")}
-                />
-              </div>
-            )}
-            <div>
-              <label htmlFor="acc-type">{t("accountType")}</label>
-              <select
-                id="acc-type"
-                value={accountType}
-                onChange={(e) => setAccountType(e.target.value)}
-              >
-                <option value="individual">{t("individual")}</option>
-                <option value="business">{t("business")}</option>
-                <option value="enterprise">{t("enterprise")}</option>
-              </select>
-            </div>
-          </div>
 
           {/* Auth mode tabs */}
           <div
@@ -338,6 +309,21 @@ export function AddAccountForm({ onComplete, onCancel }: Props) {
               {t("addWithToken")}
             </button>
           </div>
+
+          {/* Account name (only in OAuth mode) */}
+          {authMode === "oauth" && (
+            <div style={{ display: "grid", gap: 12, marginBottom: 12 }}>
+              <div>
+                <label htmlFor="acc-name">{t("accountName")}</label>
+                <input
+                  id="acc-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t("accountNamePlaceholder")}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Token input (only in token mode) */}
           {authMode === "token" && (

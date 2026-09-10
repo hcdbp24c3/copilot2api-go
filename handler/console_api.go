@@ -423,14 +423,14 @@ func handleCompleteAuth(c *gin.Context) {
 		return
 	}
 
-	if body.AccountType == "" {
-		body.AccountType = "individual"
-	}
+	// Auto-detect account type from Copilot subscription
+	accountType := detectCopilotAccountType(config.NewHTTPClient(10*time.Second), session.AccessToken)
+
 	if body.Name == "" {
 		body.Name = "GitHub Account"
 	}
 
-	account, err := store.AddAccount(body.Name, session.AccessToken, body.AccountType)
+	account, err := store.AddAccount(body.Name, session.AccessToken, accountType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -443,25 +443,20 @@ func handleCompleteAuth(c *gin.Context) {
 // handleAddToken validates a GitHub token and creates an account directly.
 // This allows users to add accounts by pasting a token (fine-grained PAT,
 // OAuth token, etc.) without going through the OAuth device flow.
+// Account type is auto-detected from the Copilot subscription.
 func handleAddToken(c *gin.Context) {
 	var body struct {
 		Name        string `json:"name"`
 		GithubToken string `json:"githubToken"`
-		AccountType string `json:"accountType"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || body.GithubToken == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name and githubToken are required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "githubToken is required"})
 		return
 	}
 
-	if body.AccountType == "" {
-		body.AccountType = "individual"
-	}
-	if body.Name == "" {
-		body.Name = "GitHub Account"
-	}
+	client := config.NewHTTPClient(10 * time.Second)
 
-	// Validate the token by calling GitHub user API
+	// Step 1: Validate token and get username
 	req, err := http.NewRequest("GET", config.GithubUserURL, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
@@ -469,9 +464,7 @@ func handleAddToken(c *gin.Context) {
 	}
 	req.Header.Set("Authorization", "token "+body.GithubToken)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-GitHub-API-Version", config.GithubAPIVersion)
 
-	client := config.NewHTTPClient(10 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to verify token: %v", err)})
@@ -492,12 +485,58 @@ func handleAddToken(c *gin.Context) {
 		body.Name = user.Login
 	}
 
-	account, err := store.AddAccount(body.Name, body.GithubToken, body.AccountType)
+	if body.Name == "" {
+		body.Name = "GitHub Account"
+	}
+
+	// Step 2: Auto-detect account type from Copilot subscription
+	accountType := detectCopilotAccountType(client, body.GithubToken)
+
+	account, err := store.AddAccount(body.Name, body.GithubToken, accountType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, account)
+}
+
+// detectCopilotAccountType calls copilot_internal/user to detect the subscription type.
+// Returns "individual" for free/pro plans, "business" for business, "enterprise" for enterprise.
+func detectCopilotAccountType(client *http.Client, token string) string {
+	req, err := http.NewRequest("GET", "https://api.github.com/copilot_internal/user", nil)
+	if err != nil {
+		return "individual"
+	}
+	req.Header.Set("Authorization", "token "+token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Editor-Version", "copilot/0.26.7")
+	req.Header.Set("Editor-Plugin-Version", "copilot/1.0.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "individual"
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "individual"
+	}
+
+	var copilotUser struct {
+		CopilotPlan string `json:"copilot_plan"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&copilotUser); err != nil {
+		return "individual"
+	}
+
+	switch copilotUser.CopilotPlan {
+	case "business":
+		return "business"
+	case "enterprise":
+		return "enterprise"
+	default:
+		return "individual"
+	}
 }
 
 // --- Pool handlers ---
